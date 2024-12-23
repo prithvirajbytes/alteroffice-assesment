@@ -1,0 +1,425 @@
+swagger: '2.0'
+info:
+  title: Custom URL Shortener API
+  description: |
+    A scalable URL Shortener API with advanced analytics, Google Sign-In authentication, and rate limiting.
+  version: 1.0.0
+servers:
+  - url: http://localhost:9000
+tags:
+  - name: Authentication
+    description: User authentication using Google Sign-In.
+  - name: URLs
+    description: URL shortening and management endpoints.
+
+securityDefinitions:
+  accessToken:
+    type: apiKey
+    in: header
+    name: Authorization
+    description: "Use the 'accessToken' in the header for authorization. Example: 'Authorization: Bearer <access_token>'"
+
+paths:
+  /auth/google:
+     get:
+      summary: Initiate Google Login
+      description: Clicking the "Try it out" button here will trigger the redirect to Google's login page.
+      responses:
+        "302":
+          description: Redirects to Google's OAuth login page.
+      tags:
+        - Authentication
+      x-codeSamples:
+        - lang: JavaScript
+          source: |
+            fetch('/auth/google', { method: 'GET' })
+              .then(res => {
+                if (res.redirected) {
+                  window.location.href = res.url;
+                }
+              })
+              .catch(err => console.error('Error:', err));
+  /api/shorten:
+    post:
+      tags:
+        - URLs
+      security:
+        - accessToken: []
+      summary: Create a new short URL
+      description: Generate a short URL for a given long URL.
+      parameters:
+        - in: body
+          name: body
+          description: URL shortening request.
+          required: true
+          schema:
+            type: object
+            properties:
+              longUrl:
+                type: string
+                description: The original long URL to shorten.
+              customAlias:
+                type: string
+                description: Custom alias for the short URL (optional).
+              topic:
+                type: string
+                description: Topic category for grouping links (optional).
+      responses:
+        '201':
+          description: Short URL created successfully.
+          schema:
+            type: object
+            properties:
+              shortUrl:
+                type: string
+                description: The generated short URL.
+              createdAt:
+                type: string
+                format: date-time
+              topic:
+                type: string
+        '400':
+          description: Invalid input.
+        '429':
+          description: Rate limit exceeded.
+  /api/shorten/{alias}:
+    get:
+      tags:
+        - URLs
+      summary: Redirect Short URL
+      description: Redirects a short URL alias to its original long URL
+      security:
+        - accessToken: []
+      parameters:
+        - in: path
+          name: alias
+          required: true
+          schema:
+            type: string
+          description: The unique alias for the short URL
+          example: abc123
+      responses:
+        '302':
+          description: Successful redirection to the original long URL
+          headers:
+            Location:
+              schema:
+                type: string
+                description: The original long URL destination
+              example: https://www.example.com/original-long-url
+        '404':
+          description: Short URL alias not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Short URL not found
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Internal server error
+  /api/analytics/{alias}:
+    get:
+      summary: "Retrieve detailed analytics for a short URL"
+      tags:
+        - Analytics
+      security:
+        - accessToken: []
+      description: "Fetch detailed analytics including total clicks, unique clicks, clicks by date, OS type, device type, and geo-location for the specified short URL alias."
+      parameters:
+        - name: alias
+          in: path
+          required: true
+          type: string
+          description: "The unique alias for the shortened URL."
+      responses:
+        200:
+          description: "Analytics data for the short URL."
+          schema:
+            type: object
+            properties:
+              totalClicks:
+                type: integer
+                example: 1234
+              uniqueClicks:
+                type: integer
+                example: 987
+              clicksByDate:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      example: "2024-11-25"
+                    count:
+                      type: integer
+                      example: 50
+              osType:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    osName:
+                      type: string
+                      example: "Windows"
+                    uniqueClicks:
+                      type: integer
+                      example: 150
+                    uniqueUsers:
+                      type: integer
+                      example: 120
+              deviceType:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    deviceName:
+                      type: string
+                      example: "mobile"
+                    uniqueClicks:
+                      type: integer
+                      example: 350
+                    uniqueUsers:
+                      type: integer
+                      example: 330
+              geoLocation:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    geoLocation:
+                      type: object
+                      properties:
+                        country:
+                          type: string
+                          example: "US"
+                        region:
+                          type: string
+                          example: "California"
+                        city:
+                          type: string
+                          example: "San Francisco"
+                    uniqueClicks:
+                      type: integer
+                      example: 100
+                    uniqueUsers:
+                      type: integer
+                      example: 80
+        400:
+          description: "Bad request. Invalid alias or missing parameter."
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid alias or missing parameter."
+        404:
+          description: "Short URL alias not found."
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Short URL alias not found."
+        500:
+          description: "Internal server error"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Internal server error"
+  /api/analytics/topic/{topic}:
+    get:
+      tags:
+        - Analytics
+      summary: "Retrieve detailed analytics for a short URL"
+      description: "Fetch detailed analytics including total clicks, unique clicks, clicks by date, OS type, device type, and geo-location for the specified short URL alias."
+      security:
+        - accessToken: []
+      parameters:
+        - name: topic
+          in: path
+          required: true
+          type: string
+          description: "The unique alias for the shortened URL."
+      responses:
+        200:
+          description: "Analytics data for the short URL."
+          schema:
+            type: object
+            properties:
+              totalClicks:
+                type: integer
+                example: 1234
+              uniqueClicks:
+                type: integer
+                example: 987
+              clicksByDate:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    date:
+                      type: string
+                      example: "2024-11-25"
+                    count:
+                      type: integer
+                      example: 50
+              osType:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    osName:
+                      type: string
+                      example: "Windows"
+                    uniqueClicks:
+                      type: integer
+                      example: 150
+                    uniqueUsers:
+                      type: integer
+                      example: 120
+              deviceType:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    deviceName:
+                      type: string
+                      example: "mobile"
+                    uniqueClicks:
+                      type: integer
+                      example: 350
+                    uniqueUsers:
+                      type: integer
+                      example: 330
+              geoLocation:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    geoLocation:
+                      type: object
+                      properties:
+                        country:
+                          type: string
+                          example: "US"
+                        region:
+                          type: string
+                          example: "California"
+                        city:
+                          type: string
+                          example: "San Francisco"
+                    uniqueClicks:
+                      type: integer
+                      example: 100
+                    uniqueUsers:
+                      type: integer
+                      example: 80
+        400:
+          description: "Bad request. Invalid alias or missing parameter."
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Invalid alias or missing parameter."
+        404:
+          description: "Short URL alias not found."
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Short URL alias not found."
+        500:
+          description: "Internal server error"
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "Internal server error"
+  /api/analytics/overall:
+    get:
+      tags:
+        - Analytics
+      summary: Retrieve overall analytics for all short URLs
+      description: Retrieve overall analytics for all short URLs created by the authenticated user, providing a comprehensive view of their link performance.
+      operationId: getOverallAnalytics
+      security:
+        - accessToken: []  # Assuming Bearer token authentication for the user
+      responses:
+        '200':
+          description: Successfully retrieved analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalUrls:
+                    type: integer
+                    description: Total number of short URLs created by the user.
+                  totalClicks:
+                    type: integer
+                    description: Total number of clicks across all URLs created by the user.
+                  uniqueClicks:
+                    type: integer
+                    description: Total number of unique users who accessed any of the user's short URLs.
+                  clicksByDate:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        date:
+                          type: string
+                          format: date
+                          description: Date of the clicks
+                        totalClicks:
+                          type: integer
+                          description: Total number of clicks on that day
+                  osType:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        osName:
+                          type: string
+                          description: Name of the operating system (e.g., Windows, macOS, Linux, iOS, Android)
+                        uniqueClicks:
+                          type: integer
+                          description: Number of unique clicks for that OS
+                        uniqueUsers:
+                          type: integer
+                          description: Number of unique users for that OS
+                  deviceType:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        deviceName:
+                          type: string
+                          description: Name of the device used (e.g., mobile, desktop)
+                        uniqueClicks:
+                          type: integer
+                          description: Number of unique clicks for that device type
+                        uniqueUsers:
+                          type: integer
+                          description: Number of unique users for that device type
+        '401':
+          description: Unauthorized - Missing or invalid authentication token
+        '500':
+          description: Internal Server Error - Something went wrong on the server
+      tags:
+        - Analytics
